@@ -1,0 +1,58 @@
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".MainActivity"
+    >
+
+    <ImageView
+        android:src="@drawable/nishiko"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+
+        />
+    <TextView
+        android:id="@+id/happy"
+        android:text="Happy birthday"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textSize="40sp"
+        android:fontFamily="sans-serif-condensed"
+        android:textColor="#669CA5"
+        android:layout_marginTop="60dp"
+        android:layout_marginLeft="30dp"
+
+        />
+    <TextView
+        android:text="my best friend!"
+        android:layout_width="wrap_content"
+
+        android:layout_height="wrap_content"
+        android:textSize="40sp"
+        android:fontFamily="sans-serif-condensed"
+        android:textColor="#669CA5"
+        android:layout_marginTop="0dp"
+        android:layout_marginLeft="60dp"
+        android:layout_below="@id/happy"
+
+        />
+
+
+    <TextView
+        android:text="Wishing you the best year"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:layout_centerHorizontal="true"
+        android:textSize="18sp"
+        android:fontFamily="sans-serif-light"
+        android:layout_marginBottom="50dp"
+        android:textColor="#F2F0FF"
+        android:textStyle="bold"
+        android:layout_marginRight="30dp"
+        />
+
+
+
+</RelativeLayout>

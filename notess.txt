@@ -1,0 +1,32 @@
+1-who
+2 -is
+3-the
+4-production
+5-lead
+6-look
+7-on
+8-the
+9-materials
+10-webpage
+
+<!--<ImageView
+        android:src="@drawable/email"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:scaleType="centerCrop"
+
+        />
+    <TextView
+        android:id="@+id/happy"
+        android:text="Happy birthday"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textSize="20sp"
+        android:fontFamily="sans-serif-condensed"
+
+        />-->
+android:adjustViewBounds="true"
+Keeps image proportions and won't crop image
+android:scaleType="centerCrop"
+Use if image won't fill empty space. May crop off part of image

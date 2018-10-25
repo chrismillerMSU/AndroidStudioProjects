@@ -1,0 +1,35 @@
+<resources>
+    <!-- Base application theme. -->
+    <style name="AppTheme" parent="Theme.AppCompat.Light.NoActionBar">
+        <!-- Primary theme color of the app (sets background color of app bar) -->
+        <item name="colorPrimary">#000</item>
+        <!-- Background color of buttons in the app -->
+        <item name="colorButtonNormal">#EBD619</item>
+    </style>
+
+    <style name="GameSetScoreStyle" parent="AppTheme">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:textColor">#fff</item>
+        <item name="android:textSize">56sp</item>
+        <item name="android:gravity">center_horizontal</item>
+        <item name="android:text">"0"</item>
+    </style>
+
+    <style name="PointScoreStyle" parent="AppTheme">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:textColor">#fff</item>
+        <item name="android:textSize">100sp</item>
+        <item name="android:gravity">center_horizontal</item>
+        <item name="android:text">"0"</item>
+    </style>
+
+    <style name="ButtonStyle" parent="AppTheme">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">0dp</item>
+        <item name="android:layout_weight">1</item>
+    </style>
+</resources>

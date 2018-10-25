@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">QuizApp</string>
+    <string name="question">Did you know pet\'s can also have pets? It\'s true! If your pet had a pet what would be the name of your pet\'s pet?</string>
+    <string name="question1">What xml attribute specifies the width of the view?android:layout_width</string>
+    <string name="question2">What xml attribute supplies a identifier name for the view?android:id</string>
+    <string name="question3">What xml attribute specifies a name of method to be invoked when clicked?android:onClick</string>
+
+
+</resources>
