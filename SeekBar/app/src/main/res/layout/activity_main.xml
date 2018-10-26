@@ -9,7 +9,7 @@
         android:layout_width="0dp"
         android:layout_height="match_parent"
         android:layout_weight="1"
-        android:gravity="center_vertical"
+          android:gravity="center_vertical"
         >
         <SeekBar
             android:id="@+id/verticalSeekBar"
@@ -22,7 +22,10 @@
             android:progress="100"
             android:progressDrawable="@drawable/custom_progress"
             android:rotation="270"
+            android:thumb="@drawable/thumb_image"
+            android:splitTrack="false"
             />
+            <!--android:rotation="270"-->
 
 
     </LinearLayout>
@@ -64,6 +67,7 @@
 
         </LinearLayout>
         <Button
+            android:id="@+id/bluetooth_connect_btn"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_alignParentBottom="true"
@@ -91,6 +95,8 @@
             android:max="200"
             android:progress="100"
             android:progressDrawable="@drawable/custom_progress"
+            android:thumb="@drawable/thumb_image"
+            android:splitTrack="false"
             />
 
 
