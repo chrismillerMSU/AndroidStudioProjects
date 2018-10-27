@@ -46,8 +46,8 @@ public class MainActivity extends AppCompatActivity {
     Button bluetooth_connect_btn;
 
     String command;
-    String drive;
-    String steer;
+    String drive = "#0";
+    String steer = "$0";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -94,6 +94,7 @@ public class MainActivity extends AppCompatActivity {
 
             public void onStopTrackingTouch(SeekBar seekBar) {
                 seekBar.setProgress(100);
+                drive = "#0";
             }
 
         });
@@ -128,7 +129,7 @@ public class MainActivity extends AppCompatActivity {
                 //Toast.makeText(MainActivity.this, "Seek bar progress is :" + progressChangedValue,
                 //Toast.LENGTH_SHORT).show();
                 seekBar.setProgress(100);
-
+                steer = "$0";
             }
         });
 
