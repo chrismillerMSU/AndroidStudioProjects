@@ -25,11 +25,11 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Set;
 import java.util.UUID;
+
 import android.widget.TextView;
 
 public class MainActivity extends AppCompatActivity {
 
-    Button submitButton;
     SeekBar verticalSeekBar;
     SeekBar simpleSeekBar;
     Boolean connected = false;
@@ -46,6 +46,9 @@ public class MainActivity extends AppCompatActivity {
     Button bluetooth_connect_btn;
 
     String command;
+    String drive;
+    String steer;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -55,8 +58,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(View v) {
 
-                if(BTinit())
-                {
+                if (BTinit()) {
                     Toast.makeText(getApplicationContext(), "BT Initialized", Toast.LENGTH_SHORT).show();
                     BTconnect();
                     //Toast.makeText(getApplicationContext(), "BT Initialized", Toast.LENGTH_SHORT).show();
@@ -65,19 +67,23 @@ public class MainActivity extends AppCompatActivity {
             }
         });
         // initiate  views
-        simpleSeekBar=(SeekBar)findViewById(R.id.simpleSeekBar);
-        verticalSeekBar=(SeekBar)findViewById(R.id.verticalSeekBar);
-        verticalSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){
+        simpleSeekBar = (SeekBar) findViewById(R.id.simpleSeekBar);
+        verticalSeekBar = (SeekBar) findViewById(R.id.verticalSeekBar);
+        verticalSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
 
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                 verticalChangedValue = progress - 100;
                 displayMessage(verticalChangedValue, (TextView) findViewById(R.id.verticalProgress), "Speed: ");
                 if (connected) {
-                    command = "#" + Integer.toString(verticalChangedValue);
-                    try {
-                        outputStream.write(command.getBytes());
-                    } catch (IOException e) {
-                        e.printStackTrace();
+                    drive = "#" + Integer.toString(verticalChangedValue);
+
+                    if (drive + steer != command) {
+                        command = drive + steer;
+                        try {
+                            outputStream.write(command.getBytes());
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
                     }
                 }
             }
@@ -100,11 +106,16 @@ public class MainActivity extends AppCompatActivity {
                         Toast.LENGTH_SHORT).show();*/
                 displayMessage(progressChangedValue, (TextView) findViewById(R.id.progress), "Turn angle: ");
                 if (connected) {
-                    command = "$" + Integer.toString(progressChangedValue);
-                    try {
-                        outputStream.write(command.getBytes());
-                    } catch (IOException e) {
-                        e.printStackTrace();
+                    steer = "$" + Integer.toString(progressChangedValue);
+
+                    if (drive + steer != command) {
+                        command = drive + steer;
+
+                        try {
+                            outputStream.write(command.getBytes());
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
                     }
                 }
             }
@@ -115,7 +126,7 @@ public class MainActivity extends AppCompatActivity {
 
             public void onStopTrackingTouch(SeekBar seekBar) {
                 //Toast.makeText(MainActivity.this, "Seek bar progress is :" + progressChangedValue,
-                        //Toast.LENGTH_SHORT).show();
+                //Toast.LENGTH_SHORT).show();
                 seekBar.setProgress(100);
 
             }
@@ -123,47 +134,39 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
-    public boolean BTinit()
-    {
+    public boolean BTinit() {
         boolean found = false;
 
         BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
 
-        if(bluetoothAdapter == null) //Checks if the device supports bluetooth
+        if (bluetoothAdapter == null) //Checks if the device supports bluetooth
         {
             Toast.makeText(getApplicationContext(), "Device doesn't support bluetooth", Toast.LENGTH_SHORT).show();
         }
-        if(BluetoothAdapter.getDefaultAdapter().isEnabled()){
+        if (BluetoothAdapter.getDefaultAdapter().isEnabled()) {
             //Toast.makeText(getApplicationContext(), "Device connected", Toast.LENGTH_SHORT).show();
         }
 
-        if(!bluetoothAdapter.isEnabled()) //Checks if bluetooth is enabled. If not, the program will ask permission from the user to enable it
+        if (!bluetoothAdapter.isEnabled()) //Checks if bluetooth is enabled. If not, the program will ask permission from the user to enable it
         {
             Intent enableAdapter = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
-            startActivityForResult(enableAdapter,0);
+            startActivityForResult(enableAdapter, 0);
 
-            try
-            {
+            try {
                 Thread.sleep(1000);
-            }
-            catch(InterruptedException e)
-            {
+            } catch (InterruptedException e) {
                 e.printStackTrace();
             }
         }
 
         Set<BluetoothDevice> bondedDevices = bluetoothAdapter.getBondedDevices();
 
-        if(bondedDevices.isEmpty()) //Checks for paired bluetooth devices
+        if (bondedDevices.isEmpty()) //Checks for paired bluetooth devices
         {
             Toast.makeText(getApplicationContext(), "Please pair the device first", Toast.LENGTH_SHORT).show();
-        }
-        else
-        {
-            for(BluetoothDevice iterator : bondedDevices)
-            {
-                if(iterator.getAddress().equals(DEVICE_ADDRESS))
-                {
+        } else {
+            for (BluetoothDevice iterator : bondedDevices) {
+                if (iterator.getAddress().equals(DEVICE_ADDRESS)) {
                     device = iterator;
                     found = true;
                     break;
@@ -174,33 +177,25 @@ public class MainActivity extends AppCompatActivity {
         return found;
     }
 
-    public boolean BTconnect()
-    {
+    public boolean BTconnect() {
         connected = true;
 
-        try
-        {
+        try {
             socket = device.createRfcommSocketToServiceRecord(PORT_UUID); //Creates a socket to handle the outgoing connection
             socket.connect();
 
             Toast.makeText(getApplicationContext(),
                     "Connection to bluetooth device successful", Toast.LENGTH_LONG).show();
             bluetooth_connect_btn.setVisibility(View.GONE);
-        }
-        catch(IOException e)
-        {
+        } catch (IOException e) {
             e.printStackTrace();
             connected = false;
         }
 
-        if(connected)
-        {
-            try
-            {
+        if (connected) {
+            try {
                 outputStream = socket.getOutputStream(); //gets the output stream of the socket
-            }
-            catch(IOException e)
-            {
+            } catch (IOException e) {
                 e.printStackTrace();
             }
         }
@@ -209,16 +204,12 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override
-    protected void onStart()
-    {
+    protected void onStart() {
         super.onStart();
     }
 
 
-
-
-
-    private void displayMessage(int value, TextView progressTextView, String text){
+    private void displayMessage(int value, TextView progressTextView, String text) {
         //TextView progressTextView = (TextView) findViewById(R.id.progress);
         progressTextView.setText(text + (value));
 
