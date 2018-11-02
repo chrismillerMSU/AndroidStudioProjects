@@ -23,22 +23,34 @@ import android.widget.Toast;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.Date;
 import java.util.Set;
 import java.util.UUID;
+import android.os.Handler;
+import java.io.InputStream;
 
 import android.widget.TextView;
 
+import org.w3c.dom.Text;
+
 public class MainActivity extends AppCompatActivity {
+    //public static java.util.concurrent.ExecutorService service;
 
     SeekBar verticalSeekBar;
     SeekBar simpleSeekBar;
     Boolean connected = false;
 
-    int progressChangedValue = 0;
-    int verticalChangedValue = 0;
+    private Thread transmit;
+    private static boolean sendUpdate = false;
 
     private final String DEVICE_ADDRESS = "00:18:E5:04:EA:FF"; //MAC Address of Bluetooth Module
     private final UUID PORT_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
+
+    Thread thread;
+    Boolean stopThread;
+    byte buffer[];
+    private InputStream inputStream;
+    TextView textView;
 
     private BluetoothDevice device;
     private BluetoothSocket socket;
@@ -48,12 +60,15 @@ public class MainActivity extends AppCompatActivity {
     String command;
     String drive = "#0";
     String steer = "$0";
+    long lastSent = System.currentTimeMillis();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
         setContentView(R.layout.activity_main);
         bluetooth_connect_btn = (Button) findViewById(R.id.bluetooth_connect_btn);
+        textView = (TextView) findViewById(R.id.receiveData);
         bluetooth_connect_btn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -69,70 +84,12 @@ public class MainActivity extends AppCompatActivity {
         // initiate  views
         simpleSeekBar = (SeekBar) findViewById(R.id.simpleSeekBar);
         verticalSeekBar = (SeekBar) findViewById(R.id.verticalSeekBar);
-        verticalSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-
-            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                verticalChangedValue = progress - 100;
-                displayMessage(verticalChangedValue, (TextView) findViewById(R.id.verticalProgress), "Speed: ");
-                if (connected) {
-                    drive = "#" + Integer.toString(verticalChangedValue);
-
-                    if (drive + steer != command) {
-                        command = drive + steer;
-                        try {
-                            outputStream.write(command.getBytes());
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
-                    }
-                }
-            }
-
-            public void onStartTrackingTouch(SeekBar seekBar) {
-                // TODO Auto-generated method stub
-            }
-
-            public void onStopTrackingTouch(SeekBar seekBar) {
-                seekBar.setProgress(100);
-                drive = "#0";
-            }
-
-        });
+        verticalSeekBar.setOnSeekBarChangeListener(listener());
         // perform seek bar change listener event used for getting the progress value
-        simpleSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+        simpleSeekBar.setOnSeekBarChangeListener(listener());
 
-            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                progressChangedValue = progress - 100;
-               /* Toast.makeText(MainActivity.this, "Seek bar progress is :" + progressChangedValue,
-                        Toast.LENGTH_SHORT).show();*/
-                displayMessage(progressChangedValue, (TextView) findViewById(R.id.progress), "Turn angle: ");
-                if (connected) {
-                    steer = "$" + Integer.toString(progressChangedValue);
-
-                    if (drive + steer != command) {
-                        command = drive + steer;
-
-                        try {
-                            outputStream.write(command.getBytes());
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
-                    }
-                }
-            }
-
-            public void onStartTrackingTouch(SeekBar seekBar) {
-                // TODO Auto-generated method stub
-            }
-
-            public void onStopTrackingTouch(SeekBar seekBar) {
-                //Toast.makeText(MainActivity.this, "Seek bar progress is :" + progressChangedValue,
-                //Toast.LENGTH_SHORT).show();
-                seekBar.setProgress(100);
-                steer = "$0";
-            }
-        });
-
+        transmit = new Thread(listenTransmit());
+        transmit.start();
     }
 
     public boolean BTinit() {
@@ -184,9 +141,10 @@ public class MainActivity extends AppCompatActivity {
         try {
             socket = device.createRfcommSocketToServiceRecord(PORT_UUID); //Creates a socket to handle the outgoing connection
             socket.connect();
+            //beginListenForData();
 
-            Toast.makeText(getApplicationContext(),
-                    "Connection to bluetooth device successful", Toast.LENGTH_LONG).show();
+            /*Toast.makeText(getApplicationContext(),
+                    "Connection to bluetooth device successful", Toast.LENGTH_LONG).show();*/
             bluetooth_connect_btn.setVisibility(View.GONE);
         } catch (IOException e) {
             e.printStackTrace();
@@ -203,6 +161,108 @@ public class MainActivity extends AppCompatActivity {
 
         return connected;
     }
+
+    //Code from http://www.electronics-lab.com/get-sensor-data-arduino-smartphone-via-bluetooth/
+    void beginListenForData(){
+        final Handler handler = new Handler();
+        stopThread = false;
+        buffer = new byte[1024];
+        /*Toast.makeText(getApplicationContext(),
+                "Test", Toast.LENGTH_LONG).show(); //pass*/
+        Thread thread  = new Thread(new Runnable()
+        {
+
+
+
+            public void run()
+            {
+                Toast.makeText(getApplicationContext(),
+                        "Test1.5", Toast.LENGTH_LONG).show(); //failed
+                Toast.makeText(getApplicationContext(),
+                        "Test2", Toast.LENGTH_LONG).show(); //failed
+                while(!Thread.currentThread().isInterrupted() && !stopThread)
+                {
+                    try
+                    {
+                        int byteCount = inputStream.available();
+                        if(byteCount > 0)
+                        {
+                            byte[] rawBytes = new byte[byteCount];
+                            inputStream.read(rawBytes);
+                            final String string=new String(rawBytes,"UTF-8");
+                            handler.post(new Runnable() {
+                                public void run()
+                                {
+                                    textView.setText(string);
+                                }
+                            });
+
+                        }
+                    }
+                    catch (IOException ex)
+                    {
+                        stopThread = true;
+                    }
+                }
+            }
+        });
+
+        thread.start();
+    }
+
+    private Runnable listenTransmit() {
+        return new Runnable() {
+            public void run() {
+                while (true) {
+                    if (sendUpdate && connected) {
+                        steer = "$" + (simpleSeekBar.getProgress() - 20);
+                        drive = "#" + (verticalSeekBar.getProgress() - 20);
+                        if (drive + "," + steer + "," != command) {
+                            command = drive + "," + steer + ",";
+                            lastSent = System.currentTimeMillis();
+
+                            try {
+                                outputStream.write(command.getBytes());
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            }
+                        }
+                        sendUpdate = false;
+                    }
+//                    ..l
+                }
+            }
+
+            ;
+        };
+    }
+
+
+    private SeekBar.OnSeekBarChangeListener listener(){
+        return new SeekBar.OnSeekBarChangeListener() {
+
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                //textView.setText(""+System.currentTimeMillis());
+                //verticalChangedValue = progress - 20;
+                displayMessage(verticalSeekBar.getProgress() - 20, (TextView) findViewById(R.id.verticalProgress), "Speed: ");
+                displayMessage(simpleSeekBar.getProgress() - 20, (TextView) findViewById(R.id.progress), "Turn angle: ");
+                if(System.currentTimeMillis() - lastSent > 200 || !fromUser || Math.abs(simpleSeekBar.getProgress()-20) == 20)
+                    sendUpdate = true;
+            }
+
+            public void onStartTrackingTouch(SeekBar seekBar) {
+                // TODO Auto-generated method stub
+            }
+
+            public void onStopTrackingTouch(SeekBar seekBar) {
+                Toast.makeText(getApplicationContext(),
+                        command, Toast.LENGTH_LONG).show();
+                seekBar.setProgress(20);
+            }
+        };
+    }
+
+
 
     @Override
     protected void onStart() {
