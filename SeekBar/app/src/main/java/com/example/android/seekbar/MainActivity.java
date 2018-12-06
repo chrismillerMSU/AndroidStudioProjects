@@ -1,3 +1,7 @@
+/*
+Written by Patrick Phattharaampornchai and Ryan Miller
+ */
+
 package com.example.android.seekbar;
 
 import android.content.Context;
