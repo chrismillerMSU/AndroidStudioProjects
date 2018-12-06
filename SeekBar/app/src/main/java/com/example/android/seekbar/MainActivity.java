@@ -1,5 +1,6 @@
 package com.example.android.seekbar;
 
+import android.content.Context;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
@@ -21,12 +22,16 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.Toast;
 
+import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Date;
 import java.util.Set;
 import java.util.UUID;
+
 import android.os.Handler;
+
 import java.io.InputStream;
 
 import android.widget.TextView;
@@ -49,8 +54,9 @@ public class MainActivity extends AppCompatActivity {
     Thread thread;
     Boolean stopThread;
     byte buffer[];
-    private InputStream inputStream;
+    InputStream inputStream;
     TextView textView;
+    float battery= 0;
 
     private BluetoothDevice device;
     private BluetoothSocket socket;
@@ -61,6 +67,18 @@ public class MainActivity extends AppCompatActivity {
     String drive = "#0";
     String steer = "$0";
     long lastSent = System.currentTimeMillis();
+    volatile boolean stopWorker;
+    int readBufferPosition;
+    byte[] readBuffer;
+    Thread listenerThread;
+//    java.io.File dir = android.os.Environment.getExternalStorageDirectory();
+//    java.io.File file = new java.io.File(dir.getAbsolutePath() + "/carControllerData.file");
+
+    long lastRunTime = 0, runningUpTime = 0;
+    double lastBattery = 0, runningBattery = 0;
+    long prevRunTime = 0;
+    double prevBatt = 0;
+    long lastSave = 0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -87,6 +105,8 @@ public class MainActivity extends AppCompatActivity {
         verticalSeekBar.setOnSeekBarChangeListener(listener());
         // perform seek bar change listener event used for getting the progress value
         simpleSeekBar.setOnSeekBarChangeListener(listener());
+
+//        readFile();
 
         transmit = new Thread(listenTransmit());
         transmit.start();
@@ -136,7 +156,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public boolean BTconnect() {
-        connected = true;
+
 
         try {
             socket = device.createRfcommSocketToServiceRecord(PORT_UUID); //Creates a socket to handle the outgoing connection
@@ -146,74 +166,84 @@ public class MainActivity extends AppCompatActivity {
             /*Toast.makeText(getApplicationContext(),
                     "Connection to bluetooth device successful", Toast.LENGTH_LONG).show();*/
             bluetooth_connect_btn.setVisibility(View.GONE);
+            //connected = true;
         } catch (IOException e) {
             e.printStackTrace();
             connected = false;
+            return connected;
         }
 
-        if (connected) {
+
             try {
                 outputStream = socket.getOutputStream(); //gets the output stream of the socket
+                inputStream = socket.getInputStream();
+                connected = true;
             } catch (IOException e) {
                 e.printStackTrace();
             }
-        }
+
 
         return connected;
     }
 
     //Code from http://www.electronics-lab.com/get-sensor-data-arduino-smartphone-via-bluetooth/
-    void beginListenForData(){
+    //https://stackoverflow.com/questions/13450406/how-to-receive-serial-data-using-android-bluetooth
+    void beginListenForData() {
         final Handler handler = new Handler();
-        stopThread = false;
-        buffer = new byte[1024];
-        /*Toast.makeText(getApplicationContext(),
-                "Test", Toast.LENGTH_LONG).show(); //pass*/
-        Thread thread  = new Thread(new Runnable()
-        {
+        final byte delimiter = 10; //This is the ASCII code for a newline character
 
+        stopWorker = false;
+        readBufferPosition = 0;
+        readBuffer = new byte[1024];
+        listenerThread = new Thread(new Runnable() {
+            public void run() {
+                while (!Thread.currentThread().isInterrupted() && !stopWorker) {
+                    try {
+                        int bytesAvailable = inputStream.available();
+                        if (bytesAvailable > 0) {
+                            byte[] packetBytes = new byte[bytesAvailable];
+                            inputStream.read(packetBytes);
+                            for (int i = 0; i < bytesAvailable; i++) {
+                                byte b = packetBytes[i];
+                                if (b == delimiter) {
+                                    byte[] encodedBytes = new byte[readBufferPosition];
+                                    System.arraycopy(readBuffer, 0, encodedBytes, 0, encodedBytes.length);
+                                    final String data = new String(encodedBytes, "US-ASCII");
+                                    readBufferPosition = 0;
 
-
-            public void run()
-            {
-                Toast.makeText(getApplicationContext(),
-                        "Test1.5", Toast.LENGTH_LONG).show(); //failed
-                Toast.makeText(getApplicationContext(),
-                        "Test2", Toast.LENGTH_LONG).show(); //failed
-                while(!Thread.currentThread().isInterrupted() && !stopThread)
-                {
-                    try
-                    {
-                        int byteCount = inputStream.available();
-                        if(byteCount > 0)
-                        {
-                            byte[] rawBytes = new byte[byteCount];
-                            inputStream.read(rawBytes);
-                            final String string=new String(rawBytes,"UTF-8");
-                            handler.post(new Runnable() {
-                                public void run()
-                                {
-                                    textView.setText(string);
+                                    handler.post(new Runnable() {
+                                        public void run() {
+                                            textView.setText(data);
+                                        }
+                                    });
+                                } else {
+                                    readBuffer[readBufferPosition++] = b;
                                 }
-                            });
-
+                            }
                         }
-                    }
-                    catch (IOException ex)
-                    {
-                        stopThread = true;
+                    } catch (IOException ex) {
+                        stopWorker = true;
                     }
                 }
             }
         });
 
-        thread.start();
+        listenerThread.start();
     }
 
+
     private Runnable listenTransmit() {
+
+        final Handler handler = new Handler();
+        final byte delimiter = 10; //This is the ASCII code for a newline character
+
+        stopWorker = false;
+        readBufferPosition = 0;
+        readBuffer = new byte[1024];
         return new Runnable() {
             public void run() {
-                while (true) {
+                final long START = System.currentTimeMillis();
+                while (!Thread.currentThread().isInterrupted() && !stopWorker) { //while(true)
                     if (sendUpdate && connected) {
                         steer = "$" + (simpleSeekBar.getProgress() - 20);
                         drive = "#" + (verticalSeekBar.getProgress() - 20);
@@ -225,20 +255,95 @@ public class MainActivity extends AppCompatActivity {
                                 outputStream.write(command.getBytes());
                             } catch (IOException e) {
                                 e.printStackTrace();
+                                //bluetooth_connect_btn.setVisibility(View.VISIBLE);
                             }
                         }
                         sendUpdate = false;
-                    }
-//                    ..l
-                }
-            }
 
-            ;
+                    }
+                    if (connected) {
+                        try {
+                            if (inputStream.available() > 0) {
+                                try {
+                                    Thread.sleep(250);
+                                } catch (InterruptedException e) {
+                                    //ignore
+                                }
+//                            final int bytesAvailable = inputStream.available();
+//                            byte[] packetBytes = new byte[bytesAvailable];
+//                            inputStream.read(packetBytes);
+                                final int BUFFER_SIZE = 256;
+                                byte[] dataReceived = new byte[BUFFER_SIZE];
+                                int index = 0;
+                                while (inputStream.available() > 0) {
+                                    int numReceived = inputStream.read(dataReceived, index, inputStream.available());
+                                    index += numReceived;
+                                }
+                                StringBuilder sb = new StringBuilder();
+                                for (byte b : dataReceived) {
+                                    sb.append((char) b); //String.format("%02X ", b));
+
+                                }
+                                String dataFinal = sb.toString();
+                                String dataPoints[] = dataFinal.split(",");
+                                try{
+                                    int temp = Integer.parseInt(dataPoints[0]); // time vector
+                                    double temp2 = Double.parseDouble(dataPoints[1]); // battery drained
+                                    runningUpTime = (temp > runningUpTime) ? temp : runningUpTime;
+                                    runningBattery = (temp2 > runningBattery) ? temp2 : runningBattery;
+                                } catch(NumberFormatException e1) {
+
+                                }
+                                dataFinal = "Battery: ";
+                                double percent = 100 - (runningBattery + lastBattery)/38.0;
+                                dataFinal += String.format("%.3f%%", percent);
+                                //double remainingTime = percent / ((100-percent)/(runningUpTime+lastRunTime));
+                                //double remainingTime = (3800 - (runningBattery + lastBattery)) / ((runningBattery - prevBatt)/(runningUpTime-prevRunTime));
+                                //dataFinal += "%\nTime Left: ";
+                                //dataFinal += String.format("%d:%d:%d", (int) Math.floor(remainingTime/3600), (int) (Math.floor(remainingTime/60)%60), (int) (Math.floor(remainingTime)%60));
+                                //final String data = new String(dataReceived , "UTF-8");
+                                final String data = dataFinal;
+//                                prevBatt = runningBattery;
+//                                prevRunTime = runningUpTime;
+                                //battery += Float.parseFloat(data);
+                                handler.post(new Runnable() {
+                                    public void run() {
+                                        textView.setText(data);
+                                        //textView.setText(("Battery: " + battery));
+                                    }
+                                });
+//                                if(System.currentTimeMillis() - lastSave > 15000) {
+//                                    lastSave = System.currentTimeMillis();
+//                                    writeFile();
+//                                }
+                            }
+
+                        } catch (IOException ex) {
+                            stopWorker = true;
+                            bluetooth_connect_btn.setVisibility(View.VISIBLE);
+                        } catch (Exception e) {
+                            //handler.post(new Runnable() {
+//                            public void run() {
+                                    textView.setText(e.getStackTrace()[0].toString().split(":")[1]);
+//                                }
+//                            });
+                        }
+
+
+                        //End
+                        //delete end if bracket
+                    }
+                }
+
+            }
         };
+
     }
 
+    ;
 
-    private SeekBar.OnSeekBarChangeListener listener(){
+
+    private SeekBar.OnSeekBarChangeListener listener() {
         return new SeekBar.OnSeekBarChangeListener() {
 
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
@@ -246,7 +351,7 @@ public class MainActivity extends AppCompatActivity {
                 //verticalChangedValue = progress - 20;
                 displayMessage(verticalSeekBar.getProgress() - 20, (TextView) findViewById(R.id.verticalProgress), "Speed: ");
                 displayMessage(simpleSeekBar.getProgress() - 20, (TextView) findViewById(R.id.progress), "Turn angle: ");
-                if(System.currentTimeMillis() - lastSent > 200 || !fromUser || Math.abs(simpleSeekBar.getProgress()-20) == 20)
+                if (System.currentTimeMillis() - lastSent > 200 || !fromUser || Math.abs(simpleSeekBar.getProgress() - 20) == 0)
                     sendUpdate = true;
             }
 
@@ -263,13 +368,51 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-
     @Override
     protected void onStart() {
         super.onStart();
     }
+    /*
+    private void readFile(){
+        try{
+            if (!dir.exists()){
+                dir.mkdirs();
+            }
+            if (!file.exists()){
+                file.createNewFile();
+            }
+            java.io.BufferedReader br = new java.io.BufferedReader(new FileReader(
+                file));
+            String in;
+            while ((in=br.readLine()) != null){
+                String[] input = in.split(",");
+                lastRunTime = Integer.parseInt(input[0]);
+                lastBattery = Integer.parseInt(input[1]);
+            }
+            br.close();
 
+        }catch(Exception e){
+        }
+    }
+    private void writeFile(){
+        try{
+            if (!dir.exists()){
+                dir.mkdirs();
+            }
+            if (!file.exists()){
+                file.createNewFile();
+            }
+            FileWriter fw = new FileWriter(file);
+            String data=String.format("%d,%.5f", runningUpTime+lastRunTime, runningBattery+lastBattery);
+            fw.write(data);
+            fw.flush();
+            fw.close();
 
+        }catch(Exception e){
+            textView.setText(file.getAbsolutePath());
+        }
+    }
+*/
     private void displayMessage(int value, TextView progressTextView, String text) {
         //TextView progressTextView = (TextView) findViewById(R.id.progress);
         progressTextView.setText(text + (value));
